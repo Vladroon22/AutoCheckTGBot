@@ -4,6 +4,7 @@
 
 <p>Data stored in this format: </p>
 ```json
+
 {
     "groups": {
         "Group№1": {
@@ -18,6 +19,7 @@
         }
     }
 }
+
 ```
 
 <p> To run bot: </p> ```make run```
