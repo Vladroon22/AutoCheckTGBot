@@ -1,8 +1,11 @@
 ## AutoCheckBot
 
 <p>The function of this bot that it collects data from user which stores in JSON file. </p>
+<p> To run bot: </p> ```make run```
+<p> To make image/docker: </p> ```make image --> make docker```
 
 <p>Data stored in this format: </p>
+
 ```json
 
 {
@@ -22,6 +25,4 @@
 
 ```
 
-<p> To run bot: </p> ```make run```
 
-<p> To make image/docker: </p> ```make image --> make docker```
