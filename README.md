@@ -1,9 +1,9 @@
 ## AutoCheckBot
 
-<p>The main function of this TG-Bot. It collects data from user which save in json file. </p>
+<p>The function of this bot that it collects data from user which stores in JSON file. </p>
 
 <p>Data stored in this format: </p>
-```
+```json
 {
     "groups": {
         "Group№1": {
