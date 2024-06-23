@@ -19,7 +19,7 @@ import (
 func MustToken() string {
 	token := flag.String(
 		"bot",
-		"6714254546:AAHrhTeFzVwO54K4VwjY8-of8skLC7l4_zY",
+		"token-of-your-bot",
 		"access to telegram-bot",
 	)
 	flag.Parse()
