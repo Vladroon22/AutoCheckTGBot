@@ -23,7 +23,7 @@
 
 ```
 
-<p> To run bot:    ```make run``` </p> 
-<p> To make image/docker:    ```make image --> make docker``` </p>
+To run bot:    ```make run``` 
+To make image/docker:    ```make image --> make docker```
 
 
