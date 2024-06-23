@@ -107,15 +107,19 @@ func (b *Bot) handleRegistration(chatID, userID int64, up tgbotapi.UpdatesChanne
 	prompts := []string{"Введите вашу учебную группу", "Ваш Логин от ЛК", "Ваш пароль от ЛК"}
 	inputs, err := b.handleInput(chatID, up, key, prompts...)
 	if err != nil {
+		b.logg.Errorln(err)
+		b.MessageToUser(chatID, key, err.Error())
 		return err
 	}
 	enc_pass, err := encryption.Hashing(inputs[2])
 	if err != nil {
+		b.logg.Errorln(err)
 		b.MessageToUser(chatID, key, err.Error())
 		return err
 	}
 	err = stud.Register(inputs[0], inputs[1], string(enc_pass))
 	if err != nil {
+		b.logg.Errorln(err)
 		b.MessageToUser(chatID, key, err.Error())
 		return err
 	}
@@ -141,11 +145,13 @@ func (b *Bot) handleEnter(chatID int64, userID int64, up tgbotapi.UpdatesChannel
 	inputs, err := b.handleInput(chatID, up, key, prompts...)
 	if err != nil {
 		b.logg.Errorln(err)
+		b.MessageToUser(chatID, key, err.Error())
 		return err
 	}
 
 	st, err := stud.Enter(inputs[0], inputs[1], inputs[2])
 	if err != nil {
+		b.logg.Errorln(err)
 		b.MessageToUser(chatID, key, err.Error())
 		return err
 	}
@@ -233,6 +239,7 @@ func (b *Bot) IsSubOnChannel(chatID, userID int64, key tgbotapi.ReplyKeyboardMar
 				),
 			)
 			b.MessageToUser(chatID, channelLink, "Чтобы получить возможность отмечаться надо подписаться")
+			b.logg.Errorln(err)
 			errChan <- err
 			return
 		} else {
