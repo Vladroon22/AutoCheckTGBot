@@ -24,6 +24,7 @@
 ```
 
 To run bot:    ```make run``` 
+
 To make image/docker:    ```make image --> make docker```
 
 
