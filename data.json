@@ -1,3 +1,14 @@
 {
-    
+    "groups": {
+        "Group№1": {
+            "relevance": true,
+            "users": [
+                {
+                    "login": "example@gmail.com",
+                    "password": "$2a$10$NCZXJvDtTONRJXsfwGf4cOfU2o3NzaFfuEyjkbh8VdgsRJ1zSL2Mq",
+                    "subscription": false
+                }
+            ]
+        }
+    }
 }

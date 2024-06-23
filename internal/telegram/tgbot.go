@@ -19,7 +19,7 @@ import (
 func MustToken() string {
 	token := flag.String(
 		"bot",
-		"token-of-bot",
+		"6714254546:AAHrhTeFzVwO54K4VwjY8-of8skLC7l4_zY",
 		"access to telegram-bot",
 	)
 	flag.Parse()
@@ -232,14 +232,13 @@ func (b *Bot) IsSubOnChannel(chatID, userID int64, key tgbotapi.ReplyKeyboardMar
 	errChan := make(chan error)
 	go func() {
 		if ok, err := b.checkSub(userID); !ok {
-			b.MessageToUser(chatID, key, err.Error())
+			//b.MessageToUser(chatID, key, err.Error())
 			channelLink := tgbotapi.NewInlineKeyboardMarkup(
 				tgbotapi.NewInlineKeyboardRow(
 					tgbotapi.NewInlineKeyboardButtonURL("Перейти в канал", "https://t.me/name_of_your_chanel"),
 				),
 			)
 			b.MessageToUser(chatID, channelLink, "Чтобы получить возможность отмечаться надо подписаться")
-			b.logg.Errorln(err)
 			errChan <- err
 			return
 		} else {
