@@ -7,12 +7,12 @@ run: build
 	./bot
 
 image: 
-	sudo docker build . -t tgbot:1.0
+	sudo docker build . -t tgbot
 image-rm:
-	sudo docker rmi tgbot:1.0
+	sudo docker rmi tgbot
 
 docker:
-	sudo docker run --name=tgbot -d tgbot:1.0
+	sudo docker run --name=tgbot -d tgbot
 docker-rm:
-	sudo docker stop tgbot:1.0
-	sudo docker rm tgbot:1.0
+	sudo docker stop tgbot
+	sudo docker rm tgbot
