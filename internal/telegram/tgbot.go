@@ -3,10 +3,9 @@ package telegram
 import (
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
-	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -15,21 +14,6 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
 )
-
-func MustToken() string {
-	token := flag.String(
-		"bot",
-		"token-of-your-bot",
-		"access to telegram-bot",
-	)
-	flag.Parse()
-
-	if *token == "" {
-		log.Fatal("invalid token")
-	}
-
-	return *token
-}
 
 type Bot struct {
 	bot      *tgbotapi.BotAPI
@@ -267,7 +251,9 @@ func (b *Bot) checkSub(userID int64) (bool, error) {
 }
 
 func GetReqToTelegram(userID int64) (bool, error) {
-	URL := fmt.Sprintf("https://api.telegram.org/bot%s/getChatMember?chat_id=@%s&user_id=%d", "token_of_your_bot", "name_of_your_channel", userID)
+	token := os.Getenv("TOKEN")
+	nameChanel := os.Getenv("CHANNEL")
+	URL := fmt.Sprintf("https://api.telegram.org/bot%s/getChatMember?chat_id=@%s&user_id=%d", token, nameChanel, userID)
 
 	resp, err := http.Get(URL)
 	if err != nil {

@@ -13,7 +13,7 @@
             "users": [
                 {
                     "login": "example@gmail.com",
-                    "password": "....",
+                    "password": "hash-of-password",
                     "subscription": false
                 }
             ]
