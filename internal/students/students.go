@@ -61,7 +61,7 @@ func writeDataToFile(groupsData *GroupsData) error {
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "    ")
 	if err := encoder.Encode(groupsData); err != nil {
-		return errors.New("Ошибка-кодирования-json")
+		return errors.New("Ошибка-декодирования-json")
 	}
 
 	return nil
