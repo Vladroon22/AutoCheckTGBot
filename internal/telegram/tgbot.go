@@ -216,7 +216,6 @@ func (b *Bot) IsSubOnChannel(chatID, userID int64, key tgbotapi.ReplyKeyboardMar
 	errChan := make(chan error)
 	go func() {
 		if ok, err := b.checkSub(userID); !ok {
-			//b.MessageToUser(chatID, key, err.Error())
 			channelLink := tgbotapi.NewInlineKeyboardMarkup(
 				tgbotapi.NewInlineKeyboardRow(
 					tgbotapi.NewInlineKeyboardButtonURL("Перейти в канал", "https://t.me/name_of_your_chanel"),
