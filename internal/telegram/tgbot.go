@@ -218,7 +218,7 @@ func (b *Bot) IsSubOnChannel(chatID, userID int64, key tgbotapi.ReplyKeyboardMar
 		if ok, err := b.checkSub(userID); !ok {
 			channelLink := tgbotapi.NewInlineKeyboardMarkup(
 				tgbotapi.NewInlineKeyboardRow(
-					tgbotapi.NewInlineKeyboardButtonURL("Перейти в канал", "https://t.me/name_of_your_chanel"),
+					tgbotapi.NewInlineKeyboardButtonURL("Перейти в канал", "https://t.me/"+os.Getenv("CHANNEL")),
 				),
 			)
 			b.MessageToUser(chatID, channelLink, "Чтобы получить возможность отмечаться надо подписаться")
