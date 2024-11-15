@@ -23,8 +23,19 @@
 
 ```
 
-To run bot:    ```make run``` 
+<h3>Export env variables</h3>
 
-To make image/docker:    ```make image --> make docker```
+```
+export token=""
+export channel=""
+
+```
+
+
+<h3>To run bot</h3>    
+
+default way: ``` make run ``` 
+
+To make image/docker: ```make image --> make docker```
 
 

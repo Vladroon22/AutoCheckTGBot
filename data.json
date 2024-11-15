@@ -9,6 +9,17 @@
                     "subscription": false
                 }
             ]
+        },
+        "qwe": {
+            "relevance": true,
+            "users": [
+                {
+                    "login": "qwe",
+                    "password": "$2a$10$nazE4GfUtatUPZ1QQ1kfDOVBRCNvtcwgGXPUfur/u2/PSH8H5IFMC",
+                    "subscription": true
+                }
+            ]
         }
     }
 }
+

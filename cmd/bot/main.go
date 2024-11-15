@@ -5,18 +5,13 @@ import (
 
 	"github.com/Vladroon22/TG-Bot/internal/telegram"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	env "github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
 	logg := logrus.New()
 
-	if err := env.Load(); err != nil {
-		logg.Fatalln(err)
-	}
-
-	bot, err := tgbotapi.NewBotAPI(os.Getenv("TOKEN"))
+	bot, err := tgbotapi.NewBotAPI(os.Getenv("token"))
 	if err != nil {
 		logg.Fatalln(err)
 	}

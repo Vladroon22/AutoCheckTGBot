@@ -121,3 +121,19 @@ func (st *Student) ChangeStatus(status bool) error {
 	}
 	return writeDataToFile(groupsData)
 }
+
+func CurrNumInFile() (int, error) {
+	groupsData, err := readDataFromFile()
+	if err != nil {
+		return 0, errors.New("Ошибка-открытия-json-файла")
+	}
+	cnt := 0
+	for _, group := range groupsData.Groups {
+		for _, user := range group.Users {
+			if user.Login != "" {
+				cnt++
+			}
+		}
+	}
+	return cnt, nil
+}

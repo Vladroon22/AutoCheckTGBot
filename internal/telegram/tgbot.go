@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Vladroon22/TG-Bot/internal/encryption"
+
 	stud "github.com/Vladroon22/TG-Bot/internal/students"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
@@ -32,7 +33,6 @@ func NewBot(bot *tgbotapi.BotAPI, logger *logrus.Logger) *Bot {
 	return &Bot{
 		bot:      bot,
 		logg:     logger,
-		nums:     0,
 		students: make(map[int]int64),
 		timeIn:   time.Time{},
 	}
@@ -57,20 +57,25 @@ func (b *Bot) Run() error {
 
 	updates := b.bot.GetUpdatesChan(u)
 
-	for update := range updates {
-		if update.Message == nil {
+	for {
+		select {
+		case update := <-updates:
+			if update.Message == nil {
+				continue
+			}
+			chatID := update.Message.Chat.ID
+			userID := update.Message.From.ID
+			switch update.Message.Text {
+			case "Регистрация":
+				b.handleRegistration(chatID, userID, updates, key)
+			case "Вход":
+				b.handleEnter(chatID, userID, updates, key)
+			}
+		default:
 			continue
 		}
-		chatID := update.Message.Chat.ID
-		userID := update.Message.From.ID
-		switch update.Message.Text {
-		case "Регистрация":
-			b.handleRegistration(chatID, userID, updates, key)
-		case "Вход":
-			b.handleEnter(chatID, userID, updates, key)
-		}
 	}
-	return nil
+
 }
 
 func (b *Bot) handleInput(chatID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup, prompts ...string) ([]string, error) {
@@ -114,8 +119,15 @@ func (b *Bot) handleRegistration(chatID, userID int64, up tgbotapi.UpdatesChanne
 		return err
 	}
 
+	num, err := stud.CurrNumInFile()
+	if err != nil {
+		b.logg.Errorln(err)
+		return err
+	}
+	b.logg.Infoln("current nums of users: ", num)
+
 	b.mutex.Lock()
-	b.nums++
+	b.nums = num + 1
 	b.students[b.nums] = userID
 	b.mutex.Unlock()
 	b.timeIn = time.Now()
@@ -146,8 +158,16 @@ func (b *Bot) handleEnter(chatID int64, userID int64, up tgbotapi.UpdatesChannel
 		return err
 	}
 
+	num, err := stud.CurrNumInFile()
+	if err != nil {
+		b.logg.Errorln(err)
+		return err
+	}
+	b.logg.Infoln("current nums of users: ", num)
+
 	b.MessageToUser(userID, key, "Выбирите свой статус")
 	b.timeIn = time.Now()
+	b.nums = num
 	b.logg.Infof("%d - has been entered at %s\n", b.students[b.nums], b.timeIn.Format(time.DateTime))
 
 	b.ChangeStatusOfStudent(st, chatID, userID, up, key)
@@ -178,6 +198,7 @@ func (b *Bot) ChangeStatusOfStudent(st *stud.Student, chatID int64, userID int64
 			}
 		}
 	}()
+
 	for {
 		select {
 		case <-exit:
@@ -187,7 +208,6 @@ func (b *Bot) ChangeStatusOfStudent(st *stud.Student, chatID int64, userID int64
 			message <- tag
 		}
 	}
-
 }
 
 func (b *Bot) MessageToUser(chatID int64, key interface{}, text string) {
@@ -218,7 +238,7 @@ func (b *Bot) IsSubOnChannel(chatID, userID int64, key tgbotapi.ReplyKeyboardMar
 		if ok, err := b.checkSub(userID); !ok {
 			channelLink := tgbotapi.NewInlineKeyboardMarkup(
 				tgbotapi.NewInlineKeyboardRow(
-					tgbotapi.NewInlineKeyboardButtonURL("Перейти в канал", "https://t.me/"+os.Getenv("CHANNEL")),
+					tgbotapi.NewInlineKeyboardButtonURL("Перейти в канал", "https://t.me/"+os.Getenv("channel")),
 				),
 			)
 			b.MessageToUser(chatID, channelLink, "Чтобы получить возможность отмечаться надо подписаться")
@@ -250,8 +270,8 @@ func (b *Bot) checkSub(userID int64) (bool, error) {
 }
 
 func GetReqToTelegram(userID int64) (bool, error) {
-	token := os.Getenv("TOKEN")
-	nameChanel := os.Getenv("CHANNEL")
+	token := os.Getenv("token")
+	nameChanel := os.Getenv("channel")
 	URL := fmt.Sprintf("https://api.telegram.org/bot%s/getChatMember?chat_id=@%s&user_id=%d", token, nameChanel, userID)
 
 	resp, err := http.Get(URL)
