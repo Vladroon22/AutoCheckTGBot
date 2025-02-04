@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/Vladroon22/TG-Bot/internal/telegram"
@@ -19,5 +20,9 @@ func main() {
 	bot.Debug = false
 
 	telebot := telegram.NewBot(bot, logg)
-	go logg.Fatalln(telebot.Run())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go logg.Fatalln("Bot failed: " + telebot.Run(ctx).Error())
+
 }
