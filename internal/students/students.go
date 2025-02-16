@@ -1,6 +1,7 @@
 package students
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -72,40 +73,29 @@ func writeDataToFile(groupsData *GroupsData) error {
 	return nil
 }
 
-func Register(groupName, login, password string) error {
+func Register(c context.Context, groupName, login, password string) error {
+	go func() error {
+		select {
+		case <-c.Done():
+			return errors.New("введите данные заново")
+		default:
+			return nil
+		}
+	}()
 	groupsData, err := readDataFromFile()
 	if err != nil {
 		return errors.New("Ошибка-открытия-json-при-регистрации")
 	}
 
 	student := Student{groupName: groupName, Login: login, Password: password, Subscription: false}
-
 	group, ok := groupsData.Groups[groupName]
 	if !ok {
 		group = Group{Relevance: true, Users: []Student{student}}
 	}
-	searchSameCh := make(chan string)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for _, st := range group.Users {
-			wg.Add(1)
-			go func(st Student) {
-				defer wg.Done()
-				if strings.EqualFold(st.Login, login) {
-					searchSameCh <- login
-					return
-				}
-			}(st)
+	for _, st := range group.Users {
+		if strings.EqualFold(st.Login, login) {
+			return errors.New("попробуйте другой логин")
 		}
-	}()
-	go func() {
-		close(searchSameCh)
-		wg.Wait()
-	}()
-	if sameLogin := <-searchSameCh; sameLogin == login {
-		return errors.New("попробуйте другой логин")
 	}
 	group.Users = append(group.Users, student)
 	groupsData.Groups[groupName] = group
@@ -117,67 +107,40 @@ func Register(groupName, login, password string) error {
 	return nil
 }
 
-func Enter(groupname, login, password string) (Student, error) {
+func Enter(c context.Context, groupname, login, password string) (Student, error) {
+	go func() error {
+		select {
+		case <-c.Done():
+			return errors.New("введите данные заново")
+		default:
+			return nil
+		}
+	}()
+
 	groupsData, err := readDataFromFile()
 	if err != nil {
 		return Student{}, errors.New("Ошибка-открытия-json-файла")
 	}
 
-	nameCh := make(chan string)
-	groupCh := make(chan Group)
-	go func() {
-		for name, group := range groupsData.Groups {
-			if strings.EqualFold(name, groupname) {
-				nameCh <- name
-				groupCh <- group
-				return
-			}
-		}
-	}()
-
-	if name := <-nameCh; name == "" {
+	group, ok := groupsData.Groups[groupname]
+	if !ok {
 		return Student{}, errors.New("Группа-не-найдена")
 	}
 
-	studCh := make(chan Student, 1)
-	errCh := make(chan error, 1)
-	groupUsers := <-groupCh
-
-	wg := sync.WaitGroup{}
-	for _, st := range groupUsers.Users {
-		wg.Add(1)
-		go func(st Student) {
-			defer wg.Done()
-			if strings.EqualFold(st.Login, login) && encryption.CmpHashAndPass(st.Password, password) {
-				studCh <- st
-				return
+	for _, st := range group.Users {
+		if strings.EqualFold(st.Login, login) {
+			if encryption.CmpHashAndPass(st.Password, password) {
+				return st, nil
+			} else {
+				return st, errors.New("Неверный-пароль")
 			}
-		}(st)
-	}
-
-	go func() {
-		wg.Wait()
-		select {
-		case st := <-studCh:
-			if st.Login != "" {
-				errCh <- nil
-			}
-		default:
-			errCh <- errors.New("Студент-не-найден")
 		}
-		close(studCh)
-		close(errCh)
-	}()
-
-	if e := <-errCh; e != nil {
-		return Student{}, e
 	}
 
-	st := <-studCh
-	return st, nil
+	return Student{}, errors.New("Студент-не-найден")
 }
 
-func (st Student) ChangeStatus(status bool) error {
+func (st *Student) ChangeStatus(status bool) error {
 	groupsData, err := readDataFromFile()
 	if err != nil {
 		return errors.New("Ошибка-открытия-json-при-регистрации")
@@ -185,7 +148,7 @@ func (st Student) ChangeStatus(status bool) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	group, ok := groupsData.Groups[st.groupName]
+	group, ok := groupsData.Groups[st.groupName] // !!!!!
 	if !ok {
 		return errors.New("Группа-не-найдена")
 	}

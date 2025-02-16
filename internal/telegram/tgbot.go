@@ -72,13 +72,11 @@ func (b *Bot) Run(ctx context.Context) error {
 			switch update.Message.Text {
 			case "Регистрация":
 				if err := b.handleRegistration(userName, chatID, userID, updates, key); err != nil {
-					b.logg.Errorln("Registration error: " + err.Error())
-					return err
+					b.logg.Errorln(err.Error())
 				}
 			case "Вход":
 				if err := b.handleEnter(chatID, userID, updates, key); err != nil {
-					b.logg.Errorln("Enter error: " + err.Error())
-					return err
+					b.logg.Errorln(err.Error())
 				}
 			}
 		}
@@ -86,11 +84,19 @@ func (b *Bot) Run(ctx context.Context) error {
 
 }
 
-func (b *Bot) handleInput(chatID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup, prompts ...string) ([]string, error) {
+func (b *Bot) handleInput(ctx context.Context, chatID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup, prompts ...string) ([]string, error) {
+	go func() error {
+		select {
+		case <-ctx.Done():
+			return errors.New("введите данные заново")
+		default:
+			return nil
+		}
+	}()
 	var inputs []string
 	for _, prompt := range prompts {
 		b.MessageToUser(chatID, key, prompt)
-		input, err := b.MessageToBot(chatID, up)
+		input, err := b.MessageToBot(ctx, chatID, up)
 		if err != nil {
 			b.logg.Errorln(err)
 			return nil, err
@@ -101,8 +107,10 @@ func (b *Bot) handleInput(chatID int64, up tgbotapi.UpdatesChannel, key tgbotapi
 }
 
 func (b *Bot) handleRegistration(userName string, chatID, userID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	prompts := []string{"Введите вашу учебную группу", "Ваш Логин от ЛК", "Ваш пароль от ЛК"}
-	inputs, err := b.handleInput(chatID, up, key, prompts...)
+	inputs, err := b.handleInput(ctx, chatID, up, key, prompts...)
 	if err != nil {
 		b.logg.Errorln(err)
 		b.MessageToUser(chatID, key, "Данные введены не корректно")
@@ -114,15 +122,14 @@ func (b *Bot) handleRegistration(userName string, chatID, userID int64, up tgbot
 		b.MessageToUser(chatID, key, "Ошибка на сервере (password hashing)")
 		return err
 	}
-	errReg := stud.Register(inputs[0], inputs[1], string(enc_pass))
-	if errReg != nil {
+	if err := stud.Register(ctx, inputs[0], inputs[1], string(enc_pass)); err != nil {
 		b.logg.Errorln(err)
-		b.MessageToUser(chatID, key, errReg.Error())
+		b.MessageToUser(chatID, key, err.Error())
 		return err
 	}
 	b.MessageToUser(chatID, key, "Данные успешно загружены")
 
-	if err := b.IsSubOnChannel(chatID, userID, key); err != nil {
+	if err := b.IsSubOnChannel(ctx, chatID, userID, key); err != nil {
 		b.MessageToUser(chatID, key, err.Error())
 		return err
 	}
@@ -137,15 +144,17 @@ func (b *Bot) handleRegistration(userName string, chatID, userID int64, up tgbot
 }
 
 func (b *Bot) handleEnter(chatID int64, userID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	prompts := []string{"Ваша учебная группа", "Ваш Логин от ЛК", "Ваш пароль от ЛК"}
-	inputs, err := b.handleInput(chatID, up, key, prompts...)
+	inputs, err := b.handleInput(ctx, chatID, up, key, prompts...)
 	if err != nil {
 		b.logg.Errorln(err)
 		b.MessageToUser(chatID, key, "Данные введенны не корректно")
 		return err
 	}
 
-	st, err := stud.Enter(inputs[0], inputs[1], inputs[2])
+	st, err := stud.Enter(ctx, inputs[0], inputs[1], inputs[2])
 	if err != nil {
 		b.logg.Errorln(err)
 		b.MessageToUser(chatID, key, err.Error())
@@ -153,20 +162,16 @@ func (b *Bot) handleEnter(chatID int64, userID int64, up tgbotapi.UpdatesChannel
 	}
 	b.MessageToUser(chatID, key, "Вход выполнен!")
 
-	b.mutex.RLock()
-	user := b.students[int(userID)]
-	b.mutex.RUnlock()
-	if err := b.IsSubOnChannel(chatID, userID, key); err != nil {
-		b.logg.Infof("%s - doesn't subcribed\n", user)
+	if err := b.IsSubOnChannel(ctx, chatID, userID, key); err != nil {
 		return err
 	}
 
-	b.ChangeStatusOfStudent(st, chatID, userID, up, key)
+	b.ChangeStatusOfStudent(ctx, &st, chatID, userID, up, key)
 
 	return nil
 }
 
-func (b *Bot) ChangeStatusOfStudent(st stud.Student, chatID int64, userID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup) {
+func (b *Bot) ChangeStatusOfStudent(c context.Context, st *stud.Student, chatID int64, userID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup) {
 	b.MessageToUser(userID, key, "Выбирите свой статус")
 	b.timeIn = time.Now()
 	b.mutex.RLock()
@@ -174,40 +179,41 @@ func (b *Bot) ChangeStatusOfStudent(st stud.Student, chatID int64, userID int64,
 	b.mutex.RUnlock()
 	b.logg.Infof("%s - has been entered at %s\n", user, b.timeIn.Format(time.DateTime))
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	message := make(chan string, 1)
 	exit := make(chan struct{}, 1)
 
 	go func() {
-		defer close(message)
-		defer close(exit)
 		for {
 			select {
 			case tag := <-message:
 				if tag == "Автопосещение Вкл" {
 					if err := st.ChangeStatus(true); err != nil {
-						b.logg.Errorln(err)
+						b.logg.Errorln(user, " - ", err)
 						b.MessageToUser(chatID, key, err.Error())
+						exit <- struct{}{}
 						return
 					}
 					b.MessageToUser(chatID, key, "Поздравляем! Вы отметились на паре!")
+					exit <- struct{}{}
 					return
 				} else if tag == "Автопосещение Выкл" {
 					if err := st.ChangeStatus(false); err != nil {
-						b.logg.Errorln(err)
+						b.logg.Errorln(user, " - ", err)
 						b.MessageToUser(chatID, key, err.Error())
+						exit <- struct{}{}
 						return
 					}
 					b.MessageToUser(chatID, key, "Вы ушли с Пары")
+					exit <- struct{}{}
 					return
 				} else {
 					b.logg.Infoln("signal channel closed")
 					exit <- struct{}{}
 					return
 				}
-			case <-ctx.Done():
+			case <-c.Done():
+				b.logg.Infoln("context done")
+				exit <- struct{}{}
 				return
 			}
 		}
@@ -215,10 +221,14 @@ func (b *Bot) ChangeStatusOfStudent(st stud.Student, chatID int64, userID int64,
 
 	for {
 		select {
+		case <-c.Done():
+			b.logg.Infoln("context done")
+			return
 		case <-exit:
+			b.logg.Infoln("channel exit")
 			return
 		default:
-			tag, _ := b.MessageToBot(chatID, up)
+			tag, _ := b.MessageToBot(c, chatID, up)
 			message <- tag
 			return
 		}
@@ -228,14 +238,14 @@ func (b *Bot) ChangeStatusOfStudent(st stud.Student, chatID int64, userID int64,
 func (b *Bot) MessageToUser(chatID int64, key interface{}, text string) {
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = key
-	_, err := b.bot.Send(msg)
-	if err != nil {
+	if _, err := b.bot.Send(msg); err != nil {
 		b.logg.Errorln(err)
+		return
 	}
 }
 
-func (b *Bot) MessageToBot(ChatID int64, updates tgbotapi.UpdatesChannel) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+func (b *Bot) MessageToBot(c context.Context, ChatID int64, updates tgbotapi.UpdatesChannel) (string, error) {
+	ctx, cancel := context.WithTimeout(c, time.Second*10)
 	defer cancel()
 
 	for {
@@ -250,7 +260,15 @@ func (b *Bot) MessageToBot(ChatID int64, updates tgbotapi.UpdatesChannel) (strin
 	}
 }
 
-func (b *Bot) IsSubOnChannel(chatID, userID int64, key tgbotapi.ReplyKeyboardMarkup) error {
+func (b *Bot) IsSubOnChannel(c context.Context, chatID, userID int64, key tgbotapi.ReplyKeyboardMarkup) error {
+	go func() error {
+		select {
+		case <-c.Done():
+			return errors.New("введите данные заново")
+		default:
+			return nil
+		}
+	}()
 	if ok, err := b.checkSub(userID); !ok {
 		channelLink := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
@@ -273,9 +291,8 @@ func (b *Bot) checkSub(userID int64) (bool, error) {
 	if !sub {
 		b.mutex.RLock()
 		user := b.students[int(userID)]
-		b.mutex.Unlock()
-		b.logg.Infoln(user + " не подписан")
-		return false, errors.New("Вы-не-подписаны")
+		b.mutex.RUnlock()
+		return false, errors.New(user + "не подписан")
 	}
 
 	return true, nil
