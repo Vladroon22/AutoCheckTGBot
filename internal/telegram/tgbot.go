@@ -10,9 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Vladroon22/TG-Bot/internal/encryption"
-
 	stud "github.com/Vladroon22/TG-Bot/internal/students"
+	"github.com/Vladroon22/TG-Bot/internal/utils"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
 )
@@ -85,14 +84,6 @@ func (b *Bot) Run(ctx context.Context) error {
 }
 
 func (b *Bot) handleInput(ctx context.Context, chatID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup, prompts ...string) ([]string, error) {
-	go func() error {
-		select {
-		case <-ctx.Done():
-			return errors.New("введите данные заново")
-		default:
-			return nil
-		}
-	}()
 	var inputs []string
 	for _, prompt := range prompts {
 		b.MessageToUser(chatID, key, prompt)
@@ -116,7 +107,7 @@ func (b *Bot) handleRegistration(userName string, chatID, userID int64, up tgbot
 		b.MessageToUser(chatID, key, "Данные введены не корректно")
 		return err
 	}
-	enc_pass, err := encryption.Hashing(inputs[2])
+	enc_pass, err := utils.Hashing(inputs[2])
 	if err != nil {
 		b.logg.Errorln(err)
 		b.MessageToUser(chatID, key, "Ошибка на сервере (password hashing)")
@@ -212,7 +203,7 @@ func (b *Bot) ChangeStatusOfStudent(c context.Context, st *stud.Student, chatID 
 					return
 				}
 			case <-c.Done():
-				b.logg.Infoln("context done")
+				b.logg.Infoln("select: context done")
 				exit <- struct{}{}
 				return
 			}
@@ -248,6 +239,16 @@ func (b *Bot) MessageToBot(c context.Context, ChatID int64, updates tgbotapi.Upd
 	ctx, cancel := context.WithTimeout(c, time.Second*10)
 	defer cancel()
 
+	errCh := make(chan error, 1)
+	go func() {
+		select {
+		case <-ctx.Done():
+			errCh <- errors.New("введите данные заново")
+		default:
+			errCh <- nil
+		}
+	}()
+
 	for {
 		select {
 		case update := <-updates:
@@ -255,20 +256,13 @@ func (b *Bot) MessageToBot(c context.Context, ChatID int64, updates tgbotapi.Upd
 				return update.Message.Text, nil
 			}
 		case <-ctx.Done():
-			return "", ctx.Err()
+			err := <-errCh
+			return "", err
 		}
 	}
 }
 
 func (b *Bot) IsSubOnChannel(c context.Context, chatID, userID int64, key tgbotapi.ReplyKeyboardMarkup) error {
-	go func() error {
-		select {
-		case <-c.Done():
-			return errors.New("введите данные заново")
-		default:
-			return nil
-		}
-	}()
 	if ok, err := b.checkSub(userID); !ok {
 		channelLink := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
