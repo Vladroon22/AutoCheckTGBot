@@ -34,6 +34,7 @@ func NewBot(bot *tgbotapi.BotAPI, logger *logrus.Logger) *Bot {
 		logg:     logger,
 		students: make(map[int]string),
 		timeIn:   time.Time{},
+		mutex:    sync.RWMutex{},
 	}
 }
 
@@ -74,7 +75,7 @@ func (b *Bot) Run(ctx context.Context) error {
 					b.logg.Errorln(err.Error())
 				}
 			case "Вход":
-				if err := b.handleEnter(chatID, userID, updates, key); err != nil {
+				if err := b.handleEnter(userName, chatID, userID, updates, key); err != nil {
 					b.logg.Errorln(err.Error())
 				}
 			}
@@ -113,7 +114,7 @@ func (b *Bot) handleRegistration(userName string, chatID, userID int64, up tgbot
 		b.MessageToUser(chatID, key, "Ошибка на сервере (password hashing)")
 		return err
 	}
-	if err := stud.Register(ctx, inputs[0], inputs[1], string(enc_pass)); err != nil {
+	if err := stud.Register(inputs[0], inputs[1], string(enc_pass)); err != nil {
 		b.logg.Errorln(err)
 		b.MessageToUser(chatID, key, err.Error())
 		return err
@@ -134,7 +135,7 @@ func (b *Bot) handleRegistration(userName string, chatID, userID int64, up tgbot
 	return nil
 }
 
-func (b *Bot) handleEnter(chatID int64, userID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup) error {
+func (b *Bot) handleEnter(userName string, chatID int64, userID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	prompts := []string{"Ваша учебная группа", "Ваш Логин от ЛК", "Ваш пароль от ЛК"}
@@ -145,7 +146,13 @@ func (b *Bot) handleEnter(chatID int64, userID int64, up tgbotapi.UpdatesChannel
 		return err
 	}
 
-	st, err := stud.Enter(ctx, inputs[0], inputs[1], inputs[2])
+	b.mutex.Lock()
+	if _, ok := b.students[int(userID)]; !ok {
+		b.students[int(userID)] = userName
+	}
+	b.mutex.Unlock()
+
+	st, err := stud.Enter(inputs[0], inputs[1], inputs[2])
 	if err != nil {
 		b.logg.Errorln(err)
 		b.MessageToUser(chatID, key, err.Error())
@@ -163,67 +170,39 @@ func (b *Bot) handleEnter(chatID int64, userID int64, up tgbotapi.UpdatesChannel
 }
 
 func (b *Bot) ChangeStatusOfStudent(c context.Context, st *stud.Student, chatID int64, userID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup) {
-	b.MessageToUser(userID, key, "Выбирите свой статус")
+	b.MessageToUser(userID, key, "Выберите свой статус")
+
 	b.timeIn = time.Now()
 	b.mutex.RLock()
 	user := b.students[int(userID)]
 	b.mutex.RUnlock()
 	b.logg.Infof("%s - has been entered at %s\n", user, b.timeIn.Format(time.DateTime))
 
-	message := make(chan string, 1)
-	exit := make(chan struct{}, 1)
+	tag, _ := b.MessageToBot(c, chatID, up)
 
-	go func() {
-		for {
-			select {
-			case tag := <-message:
-				if tag == "Автопосещение Вкл" {
-					if err := st.ChangeStatus(true); err != nil {
-						b.logg.Errorln(user, " - ", err)
-						b.MessageToUser(chatID, key, err.Error())
-						exit <- struct{}{}
-						return
-					}
-					b.MessageToUser(chatID, key, "Поздравляем! Вы отметились на паре!")
-					exit <- struct{}{}
-					return
-				} else if tag == "Автопосещение Выкл" {
-					if err := st.ChangeStatus(false); err != nil {
-						b.logg.Errorln(user, " - ", err)
-						b.MessageToUser(chatID, key, err.Error())
-						exit <- struct{}{}
-						return
-					}
-					b.MessageToUser(chatID, key, "Вы ушли с Пары")
-					exit <- struct{}{}
-					return
-				} else {
-					b.logg.Infoln("signal channel closed")
-					exit <- struct{}{}
-					return
-				}
-			case <-c.Done():
-				b.logg.Infoln("select: context done")
-				exit <- struct{}{}
-				return
-			}
-		}
-	}()
-
-	for {
-		select {
-		case <-c.Done():
-			b.logg.Infoln("context done")
-			return
-		case <-exit:
-			b.logg.Infoln("channel exit")
-			return
-		default:
-			tag, _ := b.MessageToBot(c, chatID, up)
-			message <- tag
-			return
-		}
+	switch tag {
+	case "Автопосещение Вкл":
+		b.statusChange(st, chatID, key, true, "Поздравляем! Вы отметились на паре!")
+		b.logg.Infoln("success tagging for ", user)
+	case "Автопосещение Выкл":
+		b.statusChange(st, chatID, key, false, "Вы ушли с Пары")
+		b.logg.Infoln("success tagging for ", user)
+	default:
+		b.logg.Infoln("unknown choice:", tag)
+		b.MessageToUser(chatID, key, "Неизвестная команда")
 	}
+}
+
+func (b *Bot) statusChange(st *stud.Student, chatID int64, key tgbotapi.ReplyKeyboardMarkup, status bool, statusMsg string) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if err := st.ChangeStatus(status); err != nil {
+		b.logg.Errorln(err)
+		b.MessageToUser(chatID, key, err.Error())
+		return
+	}
+	b.MessageToUser(chatID, key, statusMsg)
 }
 
 func (b *Bot) MessageToUser(chatID int64, key interface{}, text string) {

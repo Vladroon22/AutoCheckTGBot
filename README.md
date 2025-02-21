@@ -30,6 +30,13 @@ export token=""
 export channel=""
 ```
 
+or 
+
+.env-file
+```
+token=""
+channel=""
+```
 
 <h3>To run bot</h3>    
 
