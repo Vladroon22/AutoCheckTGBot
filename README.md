@@ -18,8 +18,9 @@
 <h3>Export env variables in .env-file</h3>
 
 ```
-token=""
-channel=""
+token="bot's token"
+channel="chennel's name"
+mongo="name of docker container or localhost + :27017"
 ```
 
 <h3>To run bot</h3>    
