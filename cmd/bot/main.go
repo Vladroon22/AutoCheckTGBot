@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Vladroon22/TG-Bot/internal/telegram"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -24,10 +26,22 @@ func main() {
 
 	bot.Debug = false
 
-	telebot := telegram.NewBot(bot, logg)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go logg.Fatalln("Bot failed: " + telebot.Run(ctx).Error())
+	telebot := telegram.NewBot(bot, logg)
+	go func() {
+		if err := telebot.Run(ctx); err != nil {
+			logg.Infoln(err)
+			return
+		}
+	}()
 
+	exit := make(chan os.Signal, 1)
+	signal.Notify(exit, syscall.SIGTERM, syscall.SIGINT)
+	<-exit
+
+	go func() { telebot.StopUpdates() }()
+
+	logg.Infoln("Gracefull shutdown")
 }

@@ -1,12 +1,19 @@
-FROM golang:1.23.1
+FROM golang:1.23-alpine AS builder
 
-WORKDIR /TGBOT
+WORKDIR /app
 
-RUN apt-get update && apt-get install -y make
-
-COPY . /TGBOT/
-
+COPY go.mod go.sum ./
 RUN go mod download
-RUN make 
 
-CMD [ "./bot" ]
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o ./bot cmd/bot/main.go 
+
+FROM alpine:latest
+
+WORKDIR /app
+
+COPY --from=builder /app/.env .env
+COPY --from=builder /app/bot ./bot
+
+CMD ["./bot"]
