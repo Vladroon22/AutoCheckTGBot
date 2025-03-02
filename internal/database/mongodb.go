@@ -89,13 +89,13 @@ func UpdateStudentSub(c context.Context, st *entity.Student, status bool) error 
 	return nil
 }
 
-func CheckEquillity(c context.Context, stud *entity.Student) error {
+func CheckEquillity(c context.Context, stud *entity.Student) (string, error) {
 	ctx, cancel := context.WithTimeout(c, 7*time.Second)
 	defer cancel()
 
 	client, err := ConnectToMongo(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer client.Disconnect(ctx)
 
@@ -105,20 +105,26 @@ func CheckEquillity(c context.Context, stud *entity.Student) error {
 		{Key: "login", Value: stud.Login},
 	}
 
-	var result struct {
-		Hash string `bson:"hash"`
-	}
-
+	var result bson.M
 	if err := collection.FindOne(ctx, filter).Decode(&result); err != nil {
 		if err == mongo.ErrNoDocuments {
-			return errors.New("студент не найден")
+			return "", errors.New("студент не найден")
 		}
-		return errors.New("ошибка поиска в базе данных")
+		return "", errors.New("ошибка поиска в базе данных")
 	}
 
-	if !utils.CmpHashAndPass(result.Hash, stud.Password) {
-		return errors.New("неправильный пароль")
+	Hash, ok := result["hash"]
+	if !ok {
+		return "", errors.New("неправильный пароль")
 	}
 
-	return nil
+	if !utils.CmpHashAndPass(Hash.(string), stud.Password) {
+		return "", errors.New("неправильный пароль")
+	}
+
+	id, exist := result["_id"]
+	if !exist {
+		return "", errors.New("неизвестный id пользователя")
+	}
+	return id.(string), nil
 }

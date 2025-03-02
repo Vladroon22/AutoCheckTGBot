@@ -327,7 +327,7 @@ func (b *Bot) AddNewStudent(c context.Context, s ...string) error {
 	defer cancel()
 
 	student := entity.Student{
-		ID:           bson.NewObjectID(), // ошибка здесь с id
+		ID:           bson.NewObjectID().String(), // ошибка здесь с id
 		GroupName:    s[0],
 		Login:        s[1],
 		Password:     s[2],
@@ -352,9 +352,11 @@ func (b *Bot) AuthStudent(c context.Context, s ...string) (*entity.Student, erro
 		Subscription: false,
 	}
 
-	if err := database.CheckEquillity(ctx, &student); err != nil {
+	id, err := database.CheckEquillity(ctx, &student)
+	if err != nil {
 		return nil, err
 	}
+	student.ID = id
 
 	return &student, nil
 }
