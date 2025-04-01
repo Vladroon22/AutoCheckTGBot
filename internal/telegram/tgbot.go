@@ -118,7 +118,7 @@ func (b *Bot) handleInput(ctx context.Context, chatID int64, up tgbotapi.Updates
 
 	if len(inputs) != 3 {
 		b.logg.Errorln("Некорректное количество данных: ", len(inputs))
-		return nil, errors.New("пожалуйста, введите ровно три значения: учебная группа, логин и пароль")
+		return nil, errors.New("пожалуйста, введите ровно три значения через точку: учебная группа(пробел)логин(пробел)пароль")
 	}
 
 	return inputs, nil
@@ -327,7 +327,7 @@ func (b *Bot) AddNewStudent(c context.Context, s ...string) error {
 	defer cancel()
 
 	student := entity.Student{
-		ID:           bson.NewObjectID().String(), 
+		ID:           bson.NewObjectID().String(),
 		GroupName:    s[0],
 		Login:        s[1],
 		Password:     s[2],

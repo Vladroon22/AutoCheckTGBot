@@ -6,17 +6,9 @@ build:
 run: build 
 	./bot
 
-image: 
-	sudo docker build . -t tgbot
-image-rm:
-	sudo docker rmi tgbot
 
-docker:
-	sudo docker network create my-network
-	sudo docker run --name=tgbot --network my-network -d tgbot
-	sudo docker run --name=my-mongo -p 27017:27017 --network my-network -d mongo:8.0
+compose:
+	sudo docker compose up -d
 
-docker-rm:
-	sudo docker rm -f tgbot
-	sudo docker rm -f my-mongo
-	sudo docker network rm my-network
+compose-down:
+	sudo docker compose down
