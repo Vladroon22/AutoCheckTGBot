@@ -33,13 +33,10 @@ sudo docker run --name=my-mongo -p 27017:27017 -d mongo:8.0
 make run
 ``` 
 
-<h4>To make image/docker </h4>
+<h4>To docker compose it </h4>
 
 ```
-make image
+make compose
 ```
 
-```
-make docker
-```
 
