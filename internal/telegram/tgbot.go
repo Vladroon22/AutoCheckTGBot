@@ -327,7 +327,7 @@ func (b *Bot) AddNewStudent(c context.Context, s ...string) error {
 	defer cancel()
 
 	student := entity.Student{
-		ID:           bson.NewObjectID().String(), // ошибка здесь с id
+		ID:           bson.NewObjectID().String(), 
 		GroupName:    s[0],
 		Login:        s[1],
 		Password:     s[2],
