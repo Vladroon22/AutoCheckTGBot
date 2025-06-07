@@ -65,7 +65,7 @@ func (b *Bot) Run(ctx context.Context) error {
 	updates := b.bot.GetUpdatesChan(u)
 	//wg := sync.WaitGroup{}
 	//workerPool := make(chan struct{}, 10)
-	errCh := make(chan string, 10)
+	errCh := make(chan string, 20)
 
 	for {
 		select {
@@ -118,7 +118,7 @@ func (b *Bot) handleInput(ctx context.Context, chatID int64, up tgbotapi.Updates
 
 	if len(inputs) != 3 {
 		b.logg.Errorln("Некорректное количество данных: ", len(inputs))
-		return nil, errors.New("пожалуйста, введите ровно три значения через точку: учебная группа(пробел)логин(пробел)пароль")
+		return nil, errors.New("пожалуйста, введите ровно три значения через точку: учебная группа (пробел) логин (пробел) пароль")
 	}
 
 	return inputs, nil
@@ -140,8 +140,8 @@ func (b *Bot) handleRegistration(userName string, chatID, userID int64, up tgbot
 
 	enc_pass, err := utils.Hashing(password)
 	if err != nil {
-		b.logg.Errorln(err)
-		b.MessageToUser(chatID, key, "Ошибка на сервере (password hashing)")
+		b.logg.Errorln("Server's error:", err)
+		b.MessageToUser(chatID, key, "Ошибка на сервере")
 		return err
 	}
 
@@ -244,11 +244,10 @@ func (b *Bot) ChangeStatusOfStudent(c context.Context, st *entity.Student, chatI
 
 func (b *Bot) statusChange(c context.Context, st *entity.Student, chatID int64, key tgbotapi.ReplyKeyboardMarkup, status bool, statusMsg string) error {
 	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
 	if err := database.UpdateStudentSub(c, st, status); err != nil {
 		return err
 	}
+	b.mutex.Unlock()
 
 	b.MessageToUser(chatID, key, statusMsg)
 	return nil

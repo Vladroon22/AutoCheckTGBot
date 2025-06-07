@@ -26,13 +26,10 @@ func main() {
 
 	bot.Debug = false
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	telebot := telegram.NewBot(bot, logg)
 	go func() {
-		if err := telebot.Run(ctx); err != nil {
-			logg.Infoln(err)
+		if err := telebot.Run(context.Background()); err != nil {
+			logg.Errorln(err)
 			return
 		}
 	}()
