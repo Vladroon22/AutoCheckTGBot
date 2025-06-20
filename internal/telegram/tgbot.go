@@ -24,7 +24,6 @@ type Bot struct {
 	logg     *logrus.Logger
 	students map[int]string
 	mutex    sync.RWMutex
-	timeIn   time.Time
 }
 
 type TelegaApiResp struct {
@@ -36,7 +35,6 @@ func NewBot(bot *tgbotapi.BotAPI, logger *logrus.Logger) *Bot {
 		bot:      bot,
 		logg:     logger,
 		students: make(map[int]string),
-		timeIn:   time.Time{},
 		mutex:    sync.RWMutex{},
 	}
 }
@@ -89,13 +87,11 @@ func (b *Bot) Run(ctx context.Context) error {
 			switch update.Message.Text {
 			case "Регистрация":
 				if err := b.handleRegistration(userName, chatID, userID, updates, key); err != nil {
-					b.timeIn = time.Now()
-					errCh <- err.Error() + " - " + b.timeIn.Format(time.DateTime)
+					errCh <- err.Error() + " - " + time.Now().Format(time.DateTime)
 				}
 			case "Вход":
 				if err := b.handleEnter(userName, chatID, userID, updates, key); err != nil {
-					b.timeIn = time.Now()
-					errCh <- err.Error() + " - " + b.timeIn.Format(time.DateTime)
+					errCh <- err.Error() + " - " + time.Now().Format(time.DateTime)
 				}
 			}
 		//	}(update)
@@ -140,8 +136,8 @@ func (b *Bot) handleRegistration(userName string, chatID, userID int64, up tgbot
 
 	enc_pass, err := utils.Hashing(password)
 	if err != nil {
-		b.logg.Errorln("Server's error:", err)
-		b.MessageToUser(chatID, key, "Ошибка на сервере")
+		b.logg.Errorln(err)
+		b.MessageToUser(chatID, key, "Ошибка на сервере: "+err.Error())
 		return err
 	}
 
@@ -160,8 +156,8 @@ func (b *Bot) handleRegistration(userName string, chatID, userID int64, up tgbot
 	b.mutex.Lock()
 	b.students[int(userID)] = userName
 	b.mutex.Unlock()
-	b.timeIn = time.Now()
-	b.logg.Infof("%s - has been registered at %s\n", userName, b.timeIn.Format(time.DateTime))
+	now := time.Now()
+	b.logg.Infof("%s - has been registered at %s\n", userName, now.Format(time.DateTime))
 
 	return nil
 }
@@ -186,8 +182,7 @@ func (b *Bot) handleEnter(userName string, chatID int64, userID int64, up tgbota
 	st, err := b.AuthStudent(ctx, inputs[0], inputs[1], inputs[2])
 	if err != nil {
 		b.logg.Errorln(err)
-		b.MessageToUser(chatID, key, err.Error())
-		b.MessageToUser(chatID, key, "Попробуйте еще раз")
+		b.MessageToUser(chatID, key, "Попробуйте еще раз: "+err.Error())
 		return err
 	}
 	b.MessageToUser(chatID, key, "Вход выполнен!")
@@ -207,11 +202,11 @@ func (b *Bot) handleEnter(userName string, chatID int64, userID int64, up tgbota
 func (b *Bot) ChangeStatusOfStudent(c context.Context, st *entity.Student, chatID int64, userID int64, up tgbotapi.UpdatesChannel, key tgbotapi.ReplyKeyboardMarkup) error {
 	b.MessageToUser(userID, key, "Выберите свой статус")
 
-	b.timeIn = time.Now()
+	now := time.Now()
 	b.mutex.RLock()
 	user := b.students[int(userID)]
 	b.mutex.RUnlock()
-	b.logg.Infof("%s - has been entered at %s\n", user, b.timeIn.Format(time.DateTime))
+	b.logg.Infof("%s - has been entered at %s\n", user, now.Format(time.DateTime))
 
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
@@ -220,34 +215,31 @@ func (b *Bot) ChangeStatusOfStudent(c context.Context, st *entity.Student, chatI
 
 	switch tag {
 	case "Автопосещение Вкл":
-		tm := b.timeIn
 		if err := b.statusChange(ctx, st, chatID, key, true, "Поздравляем! Вы отметились на паре!"); err != nil {
-			b.logg.Errorln(err.Error(), "for", user, tm.Format(time.DateTime))
+			b.logg.Errorln(err.Error(), "for", user, now.Format(time.DateTime))
 			return err
 		}
-		b.logg.Infoln("success tagging for", user, tm.Format(time.DateTime))
-		return nil
+		b.logg.Infoln("success tagging for", user, now.Format(time.DateTime))
 	case "Автопосещение Выкл":
-		tm := b.timeIn
 		if err := b.statusChange(ctx, st, chatID, key, false, "Вы ушли с Пары"); err != nil {
-			b.logg.Errorln(err.Error(), "for", user, tm.Format(time.DateTime))
+			b.logg.Errorln(err.Error(), "for", user, now.Format(time.DateTime))
 			return err
 		}
-		b.logg.Infoln("success tagging for", user, tm.Format(time.DateTime))
-		return nil
+		b.logg.Infoln("success tagging for", user, now.Format(time.DateTime))
 	default:
 		b.logg.Infoln("unknown choice -", tag)
 		b.MessageToUser(chatID, key, "Неизвестная команда -> авторизуйтесь заново")
-		return nil
 	}
+	return nil
 }
 
 func (b *Bot) statusChange(c context.Context, st *entity.Student, chatID int64, key tgbotapi.ReplyKeyboardMarkup, status bool, statusMsg string) error {
 	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
 	if err := database.UpdateStudentSub(c, st, status); err != nil {
 		return err
 	}
-	b.mutex.Unlock()
 
 	b.MessageToUser(chatID, key, statusMsg)
 	return nil
@@ -311,11 +303,11 @@ func (b *Bot) checkSub(ctx context.Context, userID int64) (bool, error) {
 		return false, err
 	}
 
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
 	if !sub {
-		b.mutex.RLock()
-		user := b.students[int(userID)]
-		b.mutex.RUnlock()
-		return false, errors.New(user + " не подписан")
+		return false, errors.New(b.students[int(userID)] + " не подписан")
 	}
 
 	return true, nil
