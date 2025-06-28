@@ -191,7 +191,7 @@ func (b *Bot) handleEnter(userName string, chatID int64, userID int64, up tgbota
 		return err
 	}
 
-	if err := b.ChangeStatusOfStudent(ctx, st, chatID, userID, up, key); err != nil {
+	if err := b.ChangeStatusOfStudent(ctx, &st, chatID, userID, up, key); err != nil {
 		b.MessageToUser(chatID, key, err.Error())
 		return err
 	}
@@ -215,13 +215,13 @@ func (b *Bot) ChangeStatusOfStudent(c context.Context, st *entity.Student, chatI
 
 	switch tag {
 	case "Автопосещение Вкл":
-		if err := b.statusChange(ctx, st, chatID, key, true, "Поздравляем! Вы отметились на паре!"); err != nil {
+		if err := b.statusChange(ctx, *st, chatID, key, true, "Поздравляем! Вы отметились на паре!"); err != nil {
 			b.logg.Errorln(err.Error(), "for", user, now.Format(time.DateTime))
 			return err
 		}
 		b.logg.Infoln("success tagging for", user, now.Format(time.DateTime))
 	case "Автопосещение Выкл":
-		if err := b.statusChange(ctx, st, chatID, key, false, "Вы ушли с Пары"); err != nil {
+		if err := b.statusChange(ctx, *st, chatID, key, false, "Вы ушли с Пары"); err != nil {
 			b.logg.Errorln(err.Error(), "for", user, now.Format(time.DateTime))
 			return err
 		}
@@ -233,7 +233,7 @@ func (b *Bot) ChangeStatusOfStudent(c context.Context, st *entity.Student, chatI
 	return nil
 }
 
-func (b *Bot) statusChange(c context.Context, st *entity.Student, chatID int64, key tgbotapi.ReplyKeyboardMarkup, status bool, statusMsg string) error {
+func (b *Bot) statusChange(c context.Context, st entity.Student, chatID int64, key tgbotapi.ReplyKeyboardMarkup, status bool, statusMsg string) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -303,14 +303,13 @@ func (b *Bot) checkSub(ctx context.Context, userID int64) (bool, error) {
 		return false, err
 	}
 
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
 	if !sub {
+		b.mutex.RLock()
+		defer b.mutex.RUnlock()
 		return false, errors.New(b.students[int(userID)] + " не подписан")
 	}
 
-	return true, nil
+	return sub, nil
 }
 
 func (b *Bot) AddNewStudent(c context.Context, s ...string) error {
@@ -325,14 +324,14 @@ func (b *Bot) AddNewStudent(c context.Context, s ...string) error {
 		Subscription: false,
 	}
 
-	if err := database.Insert(ctx, &student); err != nil {
+	if err := database.Insert(ctx, student); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (b *Bot) AuthStudent(c context.Context, s ...string) (*entity.Student, error) {
+func (b *Bot) AuthStudent(c context.Context, s ...string) (entity.Student, error) {
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
@@ -343,13 +342,13 @@ func (b *Bot) AuthStudent(c context.Context, s ...string) (*entity.Student, erro
 		Subscription: false,
 	}
 
-	id, err := database.CheckEquillity(ctx, &student)
+	id, err := database.CheckEquillity(ctx, student)
 	if err != nil {
-		return nil, err
+		return entity.Student{}, err
 	}
 	student.ID = id
 
-	return &student, nil
+	return student, nil
 }
 
 func getReqToTelegram(c context.Context, userID int64) (bool, error) {

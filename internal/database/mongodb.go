@@ -30,7 +30,7 @@ func ConnectToMongo(c context.Context) (*mongo.Client, error) {
 	return client, nil
 }
 
-func Insert(c context.Context, stud *entity.Student) error {
+func Insert(c context.Context, stud entity.Student) error {
 	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 
@@ -59,7 +59,7 @@ func Insert(c context.Context, stud *entity.Student) error {
 	return nil
 }
 
-func UpdateStudentSub(c context.Context, st *entity.Student, status bool) error {
+func UpdateStudentSub(c context.Context, st entity.Student, status bool) error {
 	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 
@@ -89,7 +89,7 @@ func UpdateStudentSub(c context.Context, st *entity.Student, status bool) error 
 	return nil
 }
 
-func CheckEquillity(c context.Context, stud *entity.Student) (string, error) {
+func CheckEquillity(c context.Context, stud entity.Student) (string, error) {
 	ctx, cancel := context.WithTimeout(c, 7*time.Second)
 	defer cancel()
 
